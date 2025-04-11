@@ -16,7 +16,7 @@ fn initial_state() -> (Circle, Rect, Circle, i32, bool) {
 #[macroquad::main("rockpops")]
 async fn main() {
     let (mut player, mut paper, mut scissor, mut score, mut game_started) = initial_state();
-    let player_speed = 5.0;
+    let player_speed = 4.0;
     let paper_speed = 2.0;
 
     loop {
@@ -39,29 +39,25 @@ async fn main() {
 
         if game_started {
             draw_text(&format!("Score: {score}"), 10.0, 50.0, 20.0, WHITE);
-            if is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) {
-                player.y -= player_speed;
-            }
-            if is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) {
-                player.y += player_speed;
-            }
-            if is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) {
-                player.x -= player_speed;
-            }
-            if is_key_down(KeyCode::D) || is_key_down(KeyCode::Right) {
-                player.x += player_speed;
-            }
+
+            player = move_player(player, player_speed);
+            player = Circle {
+                x: player.x.clamp(0.0 + player.r, screen_width - player.r),
+                y: player.y.clamp(0.0 + player.r, screen_height - player.r),
+                r: player.r,
+            };
 
             paper = follow_player(paper, player, paper_speed);
 
             if player.overlaps(&scissor) {
-                scissor.x = rand::gen_range(0.0, screen_width - scissor.r);
-                scissor.y = rand::gen_range(0.0, screen_height - scissor.r);
+                scissor.x = rand::gen_range(0.0 + scissor.r, screen_width - scissor.r);
+                scissor.y = rand::gen_range(0.0 + scissor.r, screen_height - scissor.r);
                 score += 1;
             } else {
                 scissor.x += rand::gen_range(-1.0, 1.0);
                 scissor.y += rand::gen_range(-1.0, 1.0);
             }
+
             if player.overlaps_rect(&paper) {
                 (player, paper, scissor, score, game_started) = initial_state();
             }
@@ -76,6 +72,33 @@ async fn main() {
         draw_rectangle(paper.x, paper.y, paper.w, paper.h, RED);
 
         next_frame().await;
+    }
+}
+
+fn move_player(player: Circle, player_speed: f32) -> Circle {
+    let mut move_y = 0.0;
+    let mut move_x = 0.0;
+    if is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) {
+        move_y -= player_speed;
+    }
+    if is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) {
+        move_y += player_speed;
+    }
+    if is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) {
+        move_x -= player_speed;
+    }
+    if is_key_down(KeyCode::D) || is_key_down(KeyCode::Right) {
+        move_x += player_speed;
+    }
+    let distance = move_x.hypot(move_y);
+    if distance > 0.0 {
+        move_x = (move_x / distance) * player_speed;
+        move_y = (move_y / distance) * player_speed;
+    }
+    Circle {
+        x: player.x + move_x,
+        y: player.y + move_y,
+        r: player.r,
     }
 }
 
