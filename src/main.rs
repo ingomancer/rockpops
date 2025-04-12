@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use macroquad::{miniquad::window::screen_size, prelude::*};
 
 fn initial_state() -> (Vec<Circle>, i32, bool) {
@@ -18,7 +16,7 @@ fn initial_state() -> (Vec<Circle>, i32, bool) {
     )
 }
 
-#[macroquad::main("rockpops")]
+#[macroquad::main("Rock Paper Shuffle!")]
 async fn main() {
     let mut names = [
         "rock".to_string(),
@@ -30,13 +28,13 @@ async fn main() {
     let (mut actors, mut score, mut game_started) = initial_state();
     let pspeed = 4.0;
     let papseed = 2.0;
-    let mut start_time = Instant::now();
+    let mut start_time = get_time_seconds();
 
     loop {
         let (screen_width, screen_height) = screen_size();
         clear_background(BLACK);
         draw_text(
-            &format!("You are a {}. Use WASD or arrows to move.", names[0]),
+            &format!("You are {}. Use WASD or arrows to move.", names[0]),
             10.0,
             10.0,
             20.0,
@@ -54,7 +52,7 @@ async fn main() {
             draw_text(
                 &format!(
                     "Score: {score}, playtime: {}",
-                    start_time.elapsed().as_secs()
+                    get_time_seconds() - start_time
                 ),
                 10.0,
                 50.0,
@@ -88,21 +86,22 @@ async fn main() {
                 (actors, score, game_started) = initial_state();
             }
 
-            if rotate_enabled && start_time.elapsed().as_secs() % 10 == 0 {
-                actors.rotate_left(1);
-                names.rotate_left(1);
-                colors.rotate_left(1);
+            if rotate_enabled && (get_time_seconds() - start_time) % 10 == 0 {
+                let direction = rand::gen_range(1, 3);
+                actors.rotate_left(direction);
+                names.rotate_left(direction);
+                colors.rotate_left(direction);
                 rotate_enabled = false;
             }
 
-            if (start_time.elapsed().as_secs() + 1) % 10 == 0 {
+            if ((get_time_seconds() - start_time) + 1) % 10 == 0 {
                 rotate_enabled = true;
             }
         } else {
             draw_text("Press space to start", 10.0, 50.0, 20.0, WHITE);
             if is_key_down(KeyCode::Space) {
                 game_started = true;
-                start_time = Instant::now();
+                start_time = get_time_seconds();
             }
         }
         draw_circle(actors[0].x, actors[0].y, actors[0].r, colors[0]);
@@ -111,6 +110,11 @@ async fn main() {
 
         next_frame().await;
     }
+}
+#[allow(clippy::cast_possible_truncation)]
+fn get_time_seconds() -> i64 {
+    let time = get_time();
+    time.round() as i64
 }
 
 fn move_player(player: Circle, pspeed: f32) -> Circle {
