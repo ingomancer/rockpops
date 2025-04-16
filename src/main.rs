@@ -16,6 +16,24 @@ fn initial_state() -> (Vec<Circle>, i32, bool) {
     )
 }
 
+fn draw_base(names: &[String; 3]) {
+    clear_background(BLACK);
+    draw_text(
+        &format!("You are {}. Use WASD or arrows to move.", names[0]),
+        10.0,
+        10.0,
+        20.0,
+        WHITE,
+    );
+    draw_text(
+        &format!("Crush {} but don't get caught by {}!", names[2], names[1]),
+        10.0,
+        30.0,
+        20.0,
+        WHITE,
+    );
+}
+
 #[macroquad::main("Rock Paper Shuffle!")]
 async fn main() {
     let mut names = [
@@ -26,28 +44,14 @@ async fn main() {
     let mut colors = [WHITE, RED, GREEN];
     let mut rotate_enabled = false;
     let (mut actors, mut score, mut game_started) = initial_state();
-    let pspeed = 4.0;
-    let papseed = 2.0;
+    let player_speed = 4.0;
+    let enemy_speed = 2.0;
     let mut start_time = get_time_seconds();
+    let mut mouse_controls = false;
 
     loop {
         let (screen_width, screen_height) = screen_size();
-        clear_background(BLACK);
-        draw_text(
-            &format!("You are {}. Use WASD or arrows to move.", names[0]),
-            10.0,
-            10.0,
-            20.0,
-            WHITE,
-        );
-        draw_text(
-            &format!("Crush {} but don't get caught by {}!", names[2], names[1]),
-            10.0,
-            30.0,
-            20.0,
-            WHITE,
-        );
-
+        draw_base(&names);
         if game_started {
             draw_text(
                 &format!(
@@ -59,8 +63,14 @@ async fn main() {
                 20.0,
                 WHITE,
             );
+            if mouse_controls {
+                let mouse_pos = mouse_position();
+                let mouse_pos = Vec2::new(mouse_pos.0, mouse_pos.1);
+                actors[0] = follow_target(actors[0], mouse_pos, player_speed);
+            } else {
+                actors[0] = move_player(actors[0], player_speed);
+            }
 
-            actors[0] = move_player(actors[0], pspeed);
             actors[0] = Circle {
                 x: actors[0]
                     .x
@@ -71,7 +81,7 @@ async fn main() {
                 r: actors[0].r,
             };
 
-            actors[1] = follow_player(actors[1], actors[0], papseed);
+            actors[1] = follow_target(actors[1], actors[0].point(), enemy_speed);
 
             if actors[0].overlaps(&actors[2]) {
                 actors[2].x = rand::gen_range(0.0 + actors[2].r, screen_width - actors[2].r);
@@ -98,10 +108,20 @@ async fn main() {
                 rotate_enabled = true;
             }
         } else {
-            draw_text("Press space to start", 10.0, 50.0, 20.0, WHITE);
+            draw_text(
+                "Press space to start (or click to start in mouse mode)",
+                10.0,
+                50.0,
+                20.0,
+                WHITE,
+            );
             if is_key_down(KeyCode::Space) {
                 game_started = true;
                 start_time = get_time_seconds();
+            } else if is_mouse_button_pressed(MouseButton::Left) {
+                game_started = true;
+                start_time = get_time_seconds();
+                mouse_controls = true;
             }
         }
         draw_circle(actors[0].x, actors[0].y, actors[0].r, colors[0]);
@@ -144,9 +164,9 @@ fn move_player(player: Circle, pspeed: f32) -> Circle {
     }
 }
 
-fn follow_player(follower: Circle, player: Circle, speed: f32) -> Circle {
-    let dx = player.x - follower.x;
-    let dy = player.y - follower.y;
+fn follow_target(follower: Circle, target: Vec2, speed: f32) -> Circle {
+    let dx = target.x - follower.x;
+    let dy = target.y - follower.y;
     let distance = dx.hypot(dy);
     if distance > 0.0 {
         let move_x = (dx / distance) * speed;
