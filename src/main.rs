@@ -1,6 +1,6 @@
 use macroquad::{miniquad::window::screen_size, prelude::*};
 
-async fn initial_state() -> (
+fn initial_state() -> (
     Vec<Circle>,
     Vec<String>,
     Vec<Texture2D>,
@@ -9,20 +9,16 @@ async fn initial_state() -> (
     bool,
     bool,
 ) {
-    let texture_path = if cfg!(target_arch = "wasm32") {
-        ""
-    } else {
-        "data/noto-emoji/"
-    };
-    let rock = load_texture(&format!("{texture_path}rock_1faa8.png"))
-        .await
-        .unwrap();
-    let paper = load_texture(&format!("{texture_path}roll-of-paper_1f9fb.png"))
-        .await
-        .unwrap();
-    let scissors = load_texture(&format!("{texture_path}scissors_2702-fe0f.png"))
-        .await
-        .unwrap();
+    let rock =
+        Texture2D::from_file_with_format(include_bytes!("../data/noto-emoji/rock_1faa8.png"), None);
+    let paper = Texture2D::from_file_with_format(
+        include_bytes!("../data/noto-emoji/roll-of-paper_1f9fb.png"),
+        None,
+    );
+    let scissors = Texture2D::from_file_with_format(
+        include_bytes!("../data/noto-emoji/scissors_2702-fe0f.png"),
+        None,
+    );
     (
         vec![
             Circle::new(50.0, 90.0, 20.0),
@@ -80,7 +76,7 @@ async fn main() {
         mut game_started,
         mut rotate_enabled,
         mut mouse_controls,
-    ) = initial_state().await;
+    ) = initial_state();
     let player_speed = 4.0;
     let enemy_speed = 2.0;
     let mut start_time = 0;
@@ -135,7 +131,7 @@ async fn main() {
                     game_started,
                     rotate_enabled,
                     mouse_controls,
-                ) = initial_state().await;
+                ) = initial_state();
             }
 
             countdown(gametime, screen_width, screen_height);
