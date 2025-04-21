@@ -1,6 +1,28 @@
 use macroquad::{miniquad::window::screen_size, prelude::*};
 
-fn initial_state() -> (Vec<Circle>, i32, bool) {
+async fn initial_state() -> (
+    Vec<Circle>,
+    Vec<String>,
+    Vec<Texture2D>,
+    i32,
+    bool,
+    bool,
+    bool,
+) {
+    let texture_path = if cfg!(target_arch = "wasm32") {
+        ""
+    } else {
+        "data/noto-emoji/"
+    };
+    let rock = load_texture(&format!("{texture_path}rock_1faa8.png"))
+        .await
+        .unwrap();
+    let paper = load_texture(&format!("{texture_path}roll-of-paper_1f9fb.png"))
+        .await
+        .unwrap();
+    let scissors = load_texture(&format!("{texture_path}scissors_2702-fe0f.png"))
+        .await
+        .unwrap();
     (
         vec![
             Circle::new(50.0, 90.0, 20.0),
@@ -11,22 +33,36 @@ fn initial_state() -> (Vec<Circle>, i32, bool) {
             },
             Circle::new(300.0, 300.0, 20.0),
         ],
+        vec![
+            "rock".to_string(),
+            "paper".to_string(),
+            "scissors".to_string(),
+        ],
+        vec![rock, paper, scissors],
         0,
+        false,
+        false,
         false,
     )
 }
 
-fn draw_base(names: &[String; 3]) {
+fn draw_base(names: &[String], mouse_controls: bool) {
     clear_background(BLACK);
+    let control_string = if mouse_controls {
+        "It follows the pointer"
+    } else {
+        "WASD or arrows to move"
+    };
+
     draw_text(
-        &format!("You are {}. Use WASD or arrows to move.", names[0]),
+        &format!("You are {}. {}", names[0], control_string),
         10.0,
         10.0,
         20.0,
         WHITE,
     );
     draw_text(
-        &format!("Crush {} but don't get caught by {}!", names[2], names[1]),
+        &format!("Catch {} but don't get caught by {}!", names[2], names[1]),
         10.0,
         30.0,
         20.0,
@@ -36,28 +72,26 @@ fn draw_base(names: &[String; 3]) {
 
 #[macroquad::main("Rock Paper Shuffle!")]
 async fn main() {
-    let mut names = [
-        "rock".to_string(),
-        "paper".to_string(),
-        "scissors".to_string(),
-    ];
-    let mut colors = [WHITE, RED, GREEN];
-    let mut rotate_enabled = false;
-    let (mut actors, mut score, mut game_started) = initial_state();
+    let (
+        mut actors,
+        mut names,
+        mut textures,
+        mut score,
+        mut game_started,
+        mut rotate_enabled,
+        mut mouse_controls,
+    ) = initial_state().await;
     let player_speed = 4.0;
     let enemy_speed = 2.0;
-    let mut start_time = get_time_seconds();
-    let mut mouse_controls = false;
+    let mut start_time = 0;
 
     loop {
         let (screen_width, screen_height) = screen_size();
-        draw_base(&names);
+        draw_base(&names, mouse_controls);
         if game_started {
+            let gametime = get_time_seconds() - start_time;
             draw_text(
-                &format!(
-                    "Score: {score}, playtime: {}",
-                    get_time_seconds() - start_time
-                ),
+                &format!("Score: {score}, playtime: {gametime}"),
                 10.0,
                 50.0,
                 20.0,
@@ -93,20 +127,31 @@ async fn main() {
             }
 
             if actors[0].overlaps(&actors[1]) {
-                (actors, score, game_started) = initial_state();
+                (
+                    actors,
+                    names,
+                    textures,
+                    score,
+                    game_started,
+                    rotate_enabled,
+                    mouse_controls,
+                ) = initial_state().await;
             }
 
-            if rotate_enabled && (get_time_seconds() - start_time) % 10 == 0 {
+            countdown(gametime, screen_width, screen_height);
+
+            if rotate_enabled && (gametime) % 10 == 0 {
                 let direction = rand::gen_range(1, 3);
                 actors.rotate_left(direction);
                 names.rotate_left(direction);
-                colors.rotate_left(direction);
+                textures.rotate_left(direction);
                 rotate_enabled = false;
             }
 
-            if ((get_time_seconds() - start_time) + 1) % 10 == 0 {
+            if ((gametime) + 1) % 10 == 0 {
                 rotate_enabled = true;
             }
+            draw_actors(&actors, &textures);
         } else {
             draw_text(
                 "Press space to start (or click to start in mouse mode)",
@@ -124,9 +169,6 @@ async fn main() {
                 mouse_controls = true;
             }
         }
-        draw_circle(actors[0].x, actors[0].y, actors[0].r, colors[0]);
-        draw_circle(actors[1].x, actors[1].y, actors[1].r, colors[1]);
-        draw_circle(actors[2].x, actors[2].y, actors[2].r, colors[2]);
 
         next_frame().await;
     }
@@ -135,6 +177,54 @@ async fn main() {
 fn get_time_seconds() -> i64 {
     let time = get_time();
     time.round() as i64
+}
+
+fn countdown(gametime: i64, screen_width: f32, screen_height: f32) {
+    let screen_center = Vec2::new(screen_width / 2.0, screen_height / 2.0);
+
+    if (gametime + 2) % 10 == 0 {
+        draw_text("Rock...", screen_center.x, screen_center.y, 50.0, WHITE);
+    }
+    if (gametime + 1) % 10 == 0 {
+        draw_text("Paper...", screen_center.x, screen_center.y, 70.0, WHITE);
+    }
+    if (gametime > 0) && (gametime) % 10 == 0 {
+        draw_text("SHUFFLE!", screen_center.x, screen_center.y, 90.0, WHITE);
+    }
+}
+
+fn draw_actors(actors: &[Circle], textures: &[Texture2D]) {
+    let time = get_time();
+    let drawparams = DrawTextureParams {
+        dest_size: Some(Vec2::new(actors[0].r * 2.0, actors[0].r * 2.0)),
+        source: None,
+        #[allow(clippy::cast_possible_truncation)]
+        rotation: time as f32,
+        pivot: None,
+        flip_x: false,
+        flip_y: false,
+    };
+    draw_texture_ex(
+        &textures[0],
+        actors[0].x - actors[0].r,
+        actors[0].y - actors[0].r,
+        WHITE,
+        drawparams.clone(),
+    );
+    draw_texture_ex(
+        &textures[1],
+        actors[1].x - actors[1].r,
+        actors[1].y - actors[1].r,
+        WHITE,
+        drawparams.clone(),
+    );
+    draw_texture_ex(
+        &textures[2],
+        actors[2].x - actors[2].r,
+        actors[2].y - actors[2].r,
+        WHITE,
+        drawparams,
+    );
 }
 
 fn move_player(player: Circle, pspeed: f32) -> Circle {
